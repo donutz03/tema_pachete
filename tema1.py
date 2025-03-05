@@ -41,6 +41,14 @@ sal_max, sal_min = salariu_maxim_minim(angajati)
 print(sal_max[1], 'e angajatul cu salariul maxim', ', iar angajatul cu salariul minim e ', sal_min[1])
 
 """
-Scrie o funcție care sortează angajații după salariu 
+5. Scrie o funcție care sortează angajații după salariu 
 (de la cel mai mic la cel mai mare) și returnează o nouă listă de tupluri sortate.
 """
+
+def sorteaza_dupa_salariu(lista_angajati):
+    copie = [i for i in lista_angajati]
+    copie.sort(key = lambda angajat : angajat[3], reverse=True)
+    return copie
+
+print('lista sortata descrescator dupa salariu')
+print(sorteaza_dupa_salariu(angajati))
