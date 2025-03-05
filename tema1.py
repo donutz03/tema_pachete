@@ -38,7 +38,7 @@ def salariu_maxim_minim(lista_angajati):
     return sal_max, sal_min
 
 sal_max, sal_min = salariu_maxim_minim(angajati)
-print(sal_max[1], 'e angajatul cu salariul maxim', ', iar angajatul cu salariul minim e ', sal_min[1])
+print(sal_max[1], 'e angajatul cu salariul maxim', ', iar angajatul cu salariul xminim e ', sal_min[1])
 
 """
 5. Scrie o funcție care sortează angajații după salariu 
