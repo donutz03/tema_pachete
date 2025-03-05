@@ -64,7 +64,14 @@ def schimba_status_comanda(id_comanda, status_nou):
 Adaugă o nouă comandă în lista de comenzi.
 """
 def adauga_comanda_in_lista(comanda):
-
+    if isinstance(comanda, list):
+        if len(comanda) == 5:
+            comenzi.append(comanda)
+        else:
+            return "comanda trebuie sa aiba 5 campuri"
+    else:
+        return "comanda trebuie sa fie o lista"
+    return comenzi[len(comenzi)-1]
 
 print(extrage_finalizate())
 print(suma_finalizate())
@@ -72,3 +79,4 @@ print(maxim_de_plata())
 print(sorteaza_comenzi_dupa_total_descrescator())
 print(schimba_status_comanda(2, "lalala"))
 print(schimba_status_comanda(1, "Anulata"))
+print(adauga_comanda_in_lista([23,'nume nou de adaugat', ['obiect nou', 'alt ob', 'inca un ob'],222, 'In Curs']))
