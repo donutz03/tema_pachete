@@ -6,6 +6,11 @@ import plotly.express as px
 from datetime import datetime
 import matplotlib.pyplot as plt
 
+# --------------------------
+# Streamlit App Configuration
+# --------------------------
+# Must be the first Streamlit command
+st.set_page_config(page_title="US Accidents Analysis", layout="wide")
 
 # --------------------------
 # Data Loading and Preparation
@@ -26,14 +31,13 @@ def load_data():
 
     return df
 
-
-df = load_data()
-
 # --------------------------
-# Streamlit App Configuration
+# App Title
 # --------------------------
-st.set_page_config(page_title="US Accidents Analysis", layout="wide")
 st.title("📊 Comprehensive Analysis of US Traffic Accidents")
+
+# Load data
+df = load_data()
 
 # --------------------------
 # Main Dashboard Sections
@@ -122,12 +126,35 @@ gdf = gpd.GeoDataFrame(
 )
 
 st.subheader("Accident Hotspots")
+
+# Option 1: Simple Streamlit map without color
+st.subheader("Basic Map")
 st.map(gdf,
        latitude='Start_Lat',
        longitude='Start_Lng',
        size='Severity',
-       color='Severity',
        use_container_width=True)
+
+# Option 2: More customizable Plotly map with color by severity
+st.subheader("Detailed Map with Severity Colors")
+# Sample for performance (adjust the sample size as needed)
+map_sample = filtered_df.sample(min(1000, len(filtered_df)))
+
+fig = px.scatter_mapbox(
+    map_sample,
+    lat='Start_Lat',
+    lon='Start_Lng',
+    color='Severity',
+    color_continuous_scale='Viridis',
+    size='Severity',
+    size_max=15,
+    zoom=3,
+    mapbox_style="carto-positron",
+    title="Accident Severity Map",
+    hover_data=['City', 'Weather_Condition', 'Severity', 'Duration']
+)
+fig.update_layout(margin={"r": 0, "t": 0, "l": 0, "b": 0})
+st.plotly_chart(fig, use_container_width=True)
 
 # --------------------------
 # Temporal Analysis
