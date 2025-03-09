@@ -12,6 +12,7 @@ import matplotlib.pyplot as plt
 # Must be the first Streamlit command
 st.set_page_config(page_title="US Accidents Analysis", layout="wide")
 
+
 # --------------------------
 # Data Loading and Preparation
 # --------------------------
@@ -30,6 +31,7 @@ def load_data():
     df['Duration'] = (df['End_Time'] - df['Start_Time']).dt.total_seconds() / 60
 
     return df
+
 
 # --------------------------
 # App Title
@@ -172,10 +174,25 @@ with temp_col1:
 
 with temp_col2:
     st.subheader("Weekly Pattern")
+    # Map weekday numbers to names
+    weekday_names = {0: 'Monday', 1: 'Tuesday', 2: 'Wednesday',
+                     3: 'Thursday', 4: 'Friday', 5: 'Saturday', 6: 'Sunday'}
+
+    # Create series with weekday numbers
     weekday_counts = filtered_df['Start_Time'].dt.weekday.value_counts().sort_index()
-    fig = px.bar(weekday_counts,
-                 labels={'index': 'Weekday', 'value': 'Accidents'},
-                 title="Accidents by Weekday")
+
+    # Convert to DataFrame and map numbers to names
+    weekday_df = pd.DataFrame({'weekday_num': weekday_counts.index,
+                               'count': weekday_counts.values})
+    weekday_df['weekday'] = weekday_df['weekday_num'].map(weekday_names)
+
+    # Create bar chart with weekday names
+    fig = px.bar(weekday_df,
+                 x='weekday',
+                 y='count',
+                 labels={'weekday': 'Day of Week', 'count': 'Number of Accidents'},
+                 title="Accidents by Weekday",
+                 category_orders={"weekday": list(weekday_names.values())})
     st.plotly_chart(fig, use_container_width=True)
 
 # --------------------------
