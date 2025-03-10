@@ -62,9 +62,11 @@ Selecting Rows
 Using loc: Select the rows where Store_Number is 3.
 Using iloc: Select the row at the third position (keep in mind Python is 0-indexed).
 '''
+randuri = df.loc[df['Store_Number']==3]
+print(randuri, '\nnumarul de randuri care au store number egal cu 3 ', len(randuri))
 
-
-
+rand = df.iloc[2]
+print('randul 3 este\n', rand)
 
 '''
 Selecting Columns

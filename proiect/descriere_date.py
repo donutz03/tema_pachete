@@ -5,6 +5,12 @@
 #Sa folosim BoxPlot. Sa pot da click pe o coloana ca sa iasa boxplot/figura.
 #Grupari de coloane
 #Modularizare : definire de functie (ca e un singur fisier cu tot codul)
+#Trebuia sa facem si meniu.
+#Selectie pe coloane
+#Sa folosim controale pe care le-am folosit in seminar2
+#ne uitam de valori extreme (outlieri), ii pastram, ii eliminam? facem boxplot
+#prelucram cu functii de grup, aplicam diverse functii de grup
+
 import streamlit as st
 import pandas as pd
 import numpy as np
