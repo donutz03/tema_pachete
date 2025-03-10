@@ -27,12 +27,8 @@ print(len(df.columns), ' e numarul de coloane')
 print('tipul de date al fiecarei coloane este\n')
 print(df.dtypes)
 
-print('numarul de date lipsa al fiecarei coloane\n')
-print(df.isna().sum())
 
-print('numarul de valori unice al fiecarei coloane')
-for column in df.columns:
-    print(column, ' ', df[column].nunique())
+
 
 # Display descriptive statistics
 print('statistici descriptive despre coloanele cu valori non-numerice')
@@ -40,17 +36,25 @@ print (df.describe())
 
 
 # Check for missing values
-
+print('numarul de date lipsa al fiecarei coloane\n')
+print(df.isna().sum())
 
 # Display number of unique values in Property column
+print('numarul de valori unice al coloanei "Property" este:')
+
+print(df['Property'].nunique())
 
 
 
 # Display number of unique values in each column
+print('numarul de valori unice al fiecarei coloane')
+for column in df.columns:
+    print(column, ' ', df[column].nunique())
 
 
 # Display unique values in each column
-
+for column in df.columns:
+    print(column, ' ', df[column].unique())
 
 
 '''
