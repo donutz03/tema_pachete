@@ -1,3 +1,8 @@
+#Tema: Metode de tratare a valorilor lipsa (3 metode). Grupari pe date. Clusterizare dupa zona pentru harta
+#Surprinderea valorilor extreme si tratarea lor. Sa schimbam graficul (de corelatie) cu seaborn. Buguri de fixat
+#Analize de DSAD (Factorial, Clusterizare, ACP, Discriminanta)
+
+#Modularizare : definire de functie (ca e un singur fisier cu tot codul)
 import streamlit as st
 import pandas as pd
 import numpy as np
