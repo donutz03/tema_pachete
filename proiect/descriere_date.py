@@ -10,7 +10,7 @@
 #Sa folosim controale pe care le-am folosit in seminar2
 #ne uitam de valori extreme (outlieri), ii pastram, ii eliminam? facem boxplot
 #prelucram cu functii de grup, aplicam diverse functii de grup
-
+#la tema folosim multe exemple cu loc si iloc (conditionat etc)
 import streamlit as st
 import pandas as pd
 import numpy as np
