@@ -28,11 +28,9 @@ print('tipul de date al fiecarei coloane este\n')
 print(df.dtypes)
 
 
-
-
 # Display descriptive statistics
 print('statistici descriptive despre coloanele cu valori non-numerice')
-print (df.describe())
+print(df.describe())
 
 
 # Check for missing values
@@ -41,9 +39,7 @@ print(df.isna().sum())
 
 # Display number of unique values in Property column
 print('numarul de valori unice al coloanei "Property" este:')
-
 print(df['Property'].nunique())
-
 
 
 # Display number of unique values in each column
@@ -73,55 +69,91 @@ Selecting Columns
 Using loc: Select the Revenue column for all rows.
 Using iloc: Select the last column for all rows.
 '''
+# Using loc to select Revenue column for all rows
+revenue_col = df.loc[:, 'Revenue']
+print("\nRevenue column for all rows using loc:")
+print(revenue_col.head())
 
-
+# Using iloc to select the last column for all rows
+last_col = df.iloc[:, -1]
+print("\nLast column for all rows using iloc:")
+print(last_col.head())
 
 '''
 Selecting Rows and Columns
 Using loc: Select Store_Number and Revenue columns for stores 1 and 4.
 Using iloc: Select the first and last columns for the first and fourth rows.
 '''
+# Using loc to select Store_Number and Revenue columns for stores 1 and 4
+selected_stores = df.loc[df['Store_Number'].isin([1, 4]), ['Store_Number', 'Revenue']]
+print("\nStore_Number and Revenue for stores 1 and 4 using loc:")
+print(selected_stores)
 
-
-
+# Using iloc to select the first and last columns for the first and fourth rows
+first_last_cols = df.iloc[[0, 3], [0, -1]]  # Rows 0 and 3, columns 0 and -1
+print("\nFirst and last columns for first and fourth rows using iloc:")
+print(first_last_cols)
 
 '''
 Conditional Selection
 Using loc: Select all rows where the Type is 'Hyper'.
-Using iloc:  iloc does not directly support conditional selection based on column values.
+Using iloc: iloc does not directly support conditional selection based on column values.
 '''
+# Using loc to select all rows where Type is 'Hyper'
+hyper_stores = df.loc[df['Type'] == 'Hyper']
+print("\nStores with Type 'Hyper' using loc:")
+print(hyper_stores)
 
-
-
+# Alternative approach for conditional selection with iloc (first find indices)
+hyper_indices = df.index[df['Type'] == 'Hyper'].tolist()
+hyper_stores_iloc = df.iloc[hyper_indices]
+print("\nStores with Type 'Hyper' using iloc (indirect):")
+print(hyper_stores_iloc)
 
 '''
 Updating a Value
 Using loc: Change the Type of store 2 to 'Super'.
-
 '''
+# First, make a copy of the dataframe to avoid modifying the original
+df_copy = df.copy()
 
-
+# Update the Type of store 2 to 'Super' using loc
+df_copy.loc[df_copy['Store_Number'] == 2, 'Type'] = 'Super'
+print("\nAfter updating Type of store 2 to 'Super':")
+print(df_copy[df_copy['Store_Number'] == 2])
 
 '''
 Slicing Rows
 Using loc: Selected rows 1 through 3 (inclusive of both ends).
 Using iloc: Selected the first three rows.
 '''
+# Using loc to select rows 1 through 3 (inclusive)
+# Assuming there's an index column that starts from 1, otherwise we need to use row indices
+rows_1_to_3_loc = df.loc[1:3]  # This will select rows with index 1, 2, and 3
+print("\nRows 1 through 3 using loc:")
+print(rows_1_to_3_loc)
 
-
+# Using iloc to select the first three rows
+first_three_rows = df.iloc[0:3]  # This will select rows at positions 0, 1, and 2
+print("\nFirst three rows using iloc:")
+print(first_three_rows)
 
 '''Calculate the total Revenue across all stores.'''
-
+total_revenue = df['Revenue'].sum()
+print(f"\nTotal Revenue across all stores: {total_revenue}")
 
 '''Calculate the average AreaStore size.'''
-
-
+avg_area = df['AreaStore'].mean()
+print(f"\nAverage AreaStore size: {avg_area}")
 
 '''Find the maximum Checkout Number across all stores. '''
-
-
+max_checkout = df['Checkout Number'].max()
+print(f"\nMaximum Checkout Number: {max_checkout}")
 
 '''Identify the store with the smallest AreaStore.'''
+smallest_area_store = df.loc[df['AreaStore'].idxmin()]
+print("\nStore with the smallest AreaStore:")
+print(smallest_area_store)
 
 
 '''------------------Group BY ----------------------------'''
@@ -154,11 +186,14 @@ as_index ->is a boolean indicating whether to group by the index (default is Tru
 '''
 
 '''Calculate the total revenue for each Type of store. '''
-
-
+revenue_by_type = df.groupby('Type')['Revenue'].sum()
+print("\nTotal revenue for each Type of store:")
+print(revenue_by_type)
 
 '''Find the average Checkout Number for each Old/New category.'''
-
+avg_checkout_by_category = df.groupby('Old/New')['Checkout Number'].mean()
+print("\nAverage Checkout Number for each Old/New category:")
+print(avg_checkout_by_category)
 
 
 '''----------------------'Aggregation'---------------------------'''
@@ -168,7 +203,9 @@ It allows you to apply one or more operations across a specified axis of the Dat
 making it highly versatile for data summarization tasks. '''
 
 '''Find the total, average, and maximum revenue for each Type of store.'''
-
+revenue_stats_by_type = df.groupby('Type')['Revenue'].agg(['sum', 'mean', 'max'])
+print("\nRevenue statistics for each Type of store:")
+print(revenue_stats_by_type)
 
 '''Identify the store with the highest revenue for each Type.'''
 '''-involves two steps: first, using groupby and idxmax to find the index of the row with
@@ -176,64 +213,83 @@ the highest revenue for each store type,
 and second, using loc to retrieve the complete information for these rows.'''
 
 # First, find the index of the max revenue per Type
-# Then, use loc to get the rows corresponding to these indices
+max_revenue_indices = df.groupby('Type')['Revenue'].idxmax()
 
+# Then, use loc to get the rows corresponding to these indices
+highest_revenue_stores = df.loc[max_revenue_indices]
+print("\nStore with the highest revenue for each Type:")
+print(highest_revenue_stores)
 
 '''For each Type of store, find the revenue of the store with the highest AreaStore, and its respective Store_Number.'''
 
 # Group by 'Type' and then apply a custom function to each group
+def get_store_with_highest_area(group):
+    max_area_idx = group['AreaStore'].idxmax()
+    return pd.Series({
+        'Store_Number': group.loc[max_area_idx, 'Store_Number'],
+        'Revenue': group.loc[max_area_idx, 'Revenue'],
+        'AreaStore': group.loc[max_area_idx, 'AreaStore']
+    })
+
+largest_stores_by_type = df.groupby('Type').apply(get_store_with_highest_area)
+print("\nRevenue and Store_Number of store with highest AreaStore for each Type:")
+print(largest_stores_by_type)
 
 
 '''_______________Graphics_________________'''
 
 # Plot the distribution of Revenue
-
-'''
-plt.hist() is a Matplotlib function that creates a histogram.
-df['Revenue'] specifies the data to be used for the histogram, in this case, the Revenue column from the DataFrame df.
-bins=20 sets the number of bins (or bars) in the histogram to 20. The range of Revenue values will be divided into 20 intervals.
-color='blue' sets the color of the bars in the histogram to blue.
-edgecolor='black' sets the color of the edge of the bars to black, enhancing visual distinction between them.
-'''
-
+plt.figure(figsize=(10, 6))
 plt.hist(df['Revenue'], bins=20, color='blue', edgecolor='black')
-plt.title('Distribution of Revenue')  # Adds a title "Distribution of Revenue" to the histogram.
-plt.xlabel('Revenue')  # Labels the x-axis as "Revenue"
-plt.ylabel('Frequency')  # Labels the y-axis as "Frequency", indicating the number of occurrences within each bin
-plt.show()  # Displays the histogram. This function must be called to actually render the plot.
+plt.title('Distribution of Revenue')
+plt.xlabel('Revenue')
+plt.ylabel('Frequency')
+plt.show()
 
 # Pie chart to visualize the distribution of Property types
-
-property_counts = df['Property'].value_counts()  # Counts the occurrences of each unique value in the Property column
-# of the DataFrame df and assigns the result to property_count
-# The value_counts() function returns a Series where the index contains the unique values
-# and the values are the counts of those unique values in the dataset.
-
+plt.figure(figsize=(8, 8))
+property_counts = df['Property'].value_counts()
 plt.pie(property_counts, labels=property_counts.index, autopct='%1.1f%%', startangle=90)
-'''plt.pie() is a Matplotlib function that creates a pie chart.
-
-The first argument, property_counts, is the data for the pie chart, representing the counts of each property type.
-
-labels=property_counts.index uses the index of property_counts (which are the unique property types) as labels for the pie chart slices.
-
-autopct='%1.1f%%' formats the percentage value of each slice to one decimal place. 
-It automatically calculates the percentage of each slice and displays it on the chart.
-
-startangle=90 rotates the start of the pie chart by 90 degrees. This means the first slice will start at the top of the chart.'''
-
 plt.title("Distribution of Property Types")
 plt.show()
 
 '''Bar Plot of Average Revenue by Store Type'''
-
 # Step 1: Group by 'Type' and calculate mean revenue
 average_revenue_by_type = df.groupby('Type')['Revenue'].mean()
 
 # Step 2: Plot directly from the DataFrame
+plt.figure(figsize=(10, 6))
 average_revenue_by_type.plot(kind='bar', color='skyblue', edgecolor='black')
-
 plt.title('Average Revenue by Store Type')
 plt.xlabel('Store Type')
 plt.ylabel('Average Revenue')
-plt.xticks(rotation=45)  # Rotate labels to improve readability
+plt.xticks(rotation=45)
+plt.show()
+
+# Additional data visualization - Scatter plot of AreaStore vs Revenue
+plt.figure(figsize=(10, 6))
+plt.scatter(df['AreaStore'], df['Revenue'], alpha=0.7, c=df['Store_Number'], cmap='viridis')
+plt.colorbar(label='Store Number')
+plt.title('Relationship between Store Area and Revenue')
+plt.xlabel('Store Area')
+plt.ylabel('Revenue')
+plt.grid(True, linestyle='--', alpha=0.7)
+plt.show()
+
+# Box plot of Revenue by Type
+plt.figure(figsize=(12, 6))
+df.boxplot(column='Revenue', by='Type', grid=False)
+plt.title('Revenue Distribution by Store Type')
+plt.ylabel('Revenue')
+plt.xticks(rotation=45)
+plt.suptitle('')  # Remove the default suptitle
+plt.show()
+
+# Line plot showing the relationship between Store_Number and Checkout Number
+plt.figure(figsize=(12, 6))
+df.sort_values('Store_Number').plot(x='Store_Number', y='Checkout Number', kind='line', marker='o')
+plt.title('Checkout Numbers by Store')
+plt.xlabel('Store Number')
+plt.ylabel('Number of Checkouts')
+plt.grid(True, linestyle='--', alpha=0.7)
 plt.show()
