@@ -1,5 +1,5 @@
 import pandas as pd
-
+#1
 df = pd.read_csv('clienti_leasing.csv')
 
 df_nou = df.loc[(df['VAL_CREDITS_RON'] == 0) & (df['DEPOSIT_AMOUNT'] > 150000),
@@ -11,7 +11,7 @@ df_nou.to_csv('rezultat_ex1.csv', index=False)
 print(df_nou)
 
 import json
-
+#2
 with open('clienti_daune.json') as f:
     data = json.load(f)
 
