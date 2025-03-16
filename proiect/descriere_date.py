@@ -65,6 +65,7 @@ with st.expander("📋 Dataset Description"):
     - **Astronomical_Twilight**: Day or night based on astronomical twilight
     """)
 
+#old load data, cu toate datele
 @st.cache_data
 def load_data():
     df = pd.read_csv('US_Accidents_March23.csv')
@@ -75,7 +76,6 @@ def load_data():
     df['Duration'] = (df['End_Time'] - df['Start_Time']).dt.total_seconds() / 60
 
     return df
-
 
 st.title("📊 Analiza Exploratorie a Accidentelor Rutiere")
 
@@ -625,29 +625,6 @@ elif menu == "Grupări și Corelații":
                 )
                 fig.update_layout(xaxis_tickangle=-45)
                 st.plotly_chart(fig, use_container_width=True)
-
-            # Oferim opțiunea de BoxPlot
-            if agg_cols and pd.api.types.is_numeric_dtype(filtered_df[agg_cols[0]]):
-                st.subheader(
-                    f"BoxPlot pentru {agg_cols[0]} grupat după {groupby_cols[0] if len(groupby_cols) > 0 else 'toate datele'}")
-
-                if len(groupby_cols) > 0:
-                    # Limitam la primele 10 categorii pentru vizibilitate
-                    top_cats = filtered_df[groupby_cols[0]].value_counts().head(10).index.tolist()
-                    plot_df = filtered_df[filtered_df[groupby_cols[0]].isin(top_cats)]
-
-                    fig, ax = plt.subplots(figsize=(12, 6))
-                    sns.boxplot(x=groupby_cols[0], y=agg_cols[0], data=plot_df, ax=ax)
-                    plt.title(f"BoxPlot pentru {agg_cols[0]} grupat după {groupby_cols[0]}")
-                    plt.xticks(rotation=45)
-                    plt.tight_layout()
-                    st.pyplot(fig)
-                else:
-                    fig, ax = plt.subplots(figsize=(10, 6))
-                    sns.boxplot(y=filtered_df[agg_cols[0]], ax=ax)
-                    plt.title(f"BoxPlot pentru {agg_cols[0]}")
-                    plt.tight_layout()
-                    st.pyplot(fig)
 
 # Adăugăm o nouă opțiune pentru BoxPlot interactiv
 st.sidebar.markdown("---")
