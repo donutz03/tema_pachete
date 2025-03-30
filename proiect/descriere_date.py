@@ -8,6 +8,9 @@ import matplotlib.pyplot as plt
 from datetime import datetime
 from sklearn.impute import KNNImputer
 from scipy import stats
+from sklearn.preprocessing import StandardScaler, MinMaxScaler, RobustScaler
+import numpy as np
+from scalare_utils import aplica_scalare, adauga_sectiune_scalare
 
 st.set_page_config(page_title="US Accidents Analysis", layout="wide")
 
@@ -83,7 +86,8 @@ with st.sidebar:
     st.header("Meniu Principal")
     menu = st.radio(
         "Selectează secțiunea:",
-        ["Analiză Generală", "Tratarea Valorilor Lipsă", "Identificarea Valorilor Extreme", "Grupări și Corelații"]
+        ["Analiză Generală", "Tratarea Valorilor Lipsă", "Identificarea Valorilor Extreme", "Grupări și Corelații",
+         "Scalarea Datelor"]
     )
 
     st.header("Filtrare Date")
@@ -625,7 +629,10 @@ elif menu == "Grupări și Corelații":
                 )
                 fig.update_layout(xaxis_tickangle=-45)
                 st.plotly_chart(fig, use_container_width=True)
-
+elif menu == "Scalarea Datelor":
+    # Aplicăm funcția pentru vizualizarea și aplicarea metodelor de scalare
+    st.header("🔄 Metode de Scalare a Datelor")
+    adauga_sectiune_scalare(filtered_df, sidebar=False)
 # Adăugăm o nouă opțiune pentru BoxPlot interactiv
 st.sidebar.markdown("---")
 if st.sidebar.checkbox("Activează BoxPlot Interactiv"):
