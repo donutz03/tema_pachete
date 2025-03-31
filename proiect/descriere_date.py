@@ -71,7 +71,7 @@ with st.expander("📋 Dataset Description"):
 #old load data, cu toate datele
 @st.cache_data
 def load_data():
-    df = pd.read_csv('US_Accidents_March23.csv')
+    df = pd.read_csv('US_Accidents_Sample_1000_Per_Year.csv')
 
     df['Start_Time'] = pd.to_datetime(df['Start_Time'], format='mixed')
     df['End_Time'] = pd.to_datetime(df['End_Time'], format='mixed')
