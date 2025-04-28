@@ -8,8 +8,13 @@ import matplotlib.pyplot as plt
 from datetime import datetime
 from sklearn.impute import KNNImputer
 from scipy import stats
-from sklearn.preprocessing import StandardScaler, MinMaxScaler, RobustScaler
-import numpy as np
+from sklearn.preprocessing import StandardScaler, MinMaxScaler, RobustScaler, LabelEncoder, OneHotEncoder
+from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import classification_report, confusion_matrix
+import statsmodels.api as sm
+from sklearn.cluster import KMeans
+from sklearn.metrics import silhouette_score, calinski_harabasz_score
 from scalare_utils import aplica_scalare, adauga_sectiune_scalare
 
 st.set_page_config(page_title="US Accidents Analysis", layout="wide")
@@ -87,7 +92,7 @@ with st.sidebar:
     menu = st.radio(
         "Selectează secțiunea:",
         ["Analiză Generală", "Tratarea Valorilor Lipsă", "Identificarea Valorilor Extreme", "Grupări și Corelații",
-         "Scalarea Datelor"]
+         "Scalarea Datelor", "Codificare și Regresie", "Clusterizare"]
     )
 
     st.header("Filtrare Date")
@@ -629,10 +634,12 @@ elif menu == "Grupări și Corelații":
                 )
                 fig.update_layout(xaxis_tickangle=-45)
                 st.plotly_chart(fig, use_container_width=True)
+
 elif menu == "Scalarea Datelor":
     # Aplicăm funcția pentru vizualizarea și aplicarea metodelor de scalare
     st.header("🔄 Metode de Scalare a Datelor")
     adauga_sectiune_scalare(filtered_df, sidebar=False)
+
 # Adăugăm o nouă opțiune pentru BoxPlot interactiv
 st.sidebar.markdown("---")
 if st.sidebar.checkbox("Activează BoxPlot Interactiv"):
@@ -681,3 +688,278 @@ if st.sidebar.checkbox("Activează BoxPlot Interactiv"):
         plt.axvline(upper_bound, color='r', linestyle='--')
         plt.legend()
         st.pyplot(fig)
+
+elif menu == "Codificare și Regresie":
+    st.header("🔢 Codificare și Analiză de Regresie")
+    
+    tabs = st.tabs(["Codificare Date", "Regresie Logistică", "Regresie Multiplă"])
+    
+    with tabs[0]:
+        st.subheader("Codificare Date")
+        
+        # Selectăm coloanele categorice pentru codificare
+        categorical_cols = filtered_df.select_dtypes(include=['object']).columns.tolist()
+        selected_col = st.selectbox("Selectează coloana pentru codificare", categorical_cols)
+        
+        encoding_method = st.radio("Alege metoda de codificare:", ["Label Encoding", "One-Hot Encoding"])
+        
+        if encoding_method == "Label Encoding":
+            le = LabelEncoder()
+            encoded_values = le.fit_transform(filtered_df[selected_col].fillna('Missing'))
+            
+            # Creăm un DataFrame pentru vizualizare
+            encoding_df = pd.DataFrame({
+                'Valoare Originală': filtered_df[selected_col].fillna('Missing'),
+                'Valoare Codificată': encoded_values
+            }).drop_duplicates().sort_values('Valoare Codificată')
+            
+            st.dataframe(encoding_df, use_container_width=True)
+            
+        else:  # One-Hot Encoding
+            ohe = OneHotEncoder(sparse=False)
+            encoded_values = ohe.fit_transform(filtered_df[[selected_col]].fillna('Missing'))
+            
+            # Creăm un DataFrame pentru vizualizare
+            feature_names = [f"{selected_col}_{val}" for val in ohe.categories_[0]]
+            encoding_df = pd.DataFrame(encoded_values, columns=feature_names)
+            
+            st.dataframe(encoding_df.head(), use_container_width=True)
+            
+            # Vizualizăm distribuția valorilor codificate
+            fig = px.bar(encoding_df.sum(), title=f"Distribuția valorilor codificate pentru {selected_col}")
+            st.plotly_chart(fig)
+    
+    with tabs[1]:
+        st.subheader("Regresie Logistică")
+        
+        # Selectăm variabilele pentru regresie logistică
+        target_col = st.selectbox("Selectează variabila țintă (binară)", 
+                                ['Severity', 'Amenity', 'Bump', 'Crossing', 'Give_Way', 'Junction', 'No_Exit'],
+                                key="logistic_target")
+        
+        feature_cols = st.multiselect("Selectează variabilele predictoare (numerice)",
+                                    filtered_df.select_dtypes(include=[np.number]).columns.tolist(),
+                                    default=['Temperature(F)', 'Humidity(%)', 'Pressure(in)', 'Visibility(mi)', 'Wind_Speed(mph)'],
+                                    key="logistic_features")
+        
+        if len(feature_cols) > 0:
+            # Pregătim datele
+            X = filtered_df[feature_cols].fillna(filtered_df[feature_cols].mean())
+            y = (filtered_df[target_col] > filtered_df[target_col].median()).astype(int)
+            
+            # Împărțim datele în set de antrenare și test
+            X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+            
+            # Antrenăm modelul
+            model = LogisticRegression(max_iter=1000)
+            model.fit(X_train, y_train)
+            
+            # Evaluăm modelul
+            y_pred = model.predict(X_test)
+            
+            st.subheader("Rezultate Model")
+            st.text(classification_report(y_test, y_pred))
+            
+            # Vizualizăm matricea de confuzie
+            cm = confusion_matrix(y_test, y_pred)
+            fig, ax = plt.subplots(figsize=(8, 6))
+            sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', ax=ax)
+            ax.set_xlabel('Predicted')
+            ax.set_ylabel('Actual')
+            st.pyplot(fig)
+            
+            # Afișăm coeficienții modelului
+            coef_df = pd.DataFrame({
+                'Feature': feature_cols,
+                'Coefficient': model.coef_[0]
+            })
+            st.dataframe(coef_df.sort_values('Coefficient', ascending=False), use_container_width=True)
+    
+    with tabs[2]:
+        st.subheader("Regresie Multiplă")
+        
+        # Selectăm variabilele pentru regresie multiplă
+        target_col = st.selectbox("Selectează variabila țintă (numerică)", 
+                                ['Duration', 'Distance(mi)', 'Temperature(F)', 'Humidity(%)', 'Pressure(in)', 'Visibility(mi)', 'Wind_Speed(mph)'],
+                                key="multiple_target")
+        
+        feature_cols = st.multiselect("Selectează variabilele predictoare (numerice)",
+                                    filtered_df.select_dtypes(include=[np.number]).columns.tolist(),
+                                    default=['Temperature(F)', 'Humidity(%)', 'Pressure(in)', 'Visibility(mi)', 'Wind_Speed(mph)'],
+                                    key="multiple_features")
+        
+        if len(feature_cols) > 0:
+            # Pregătim datele
+            X = filtered_df[feature_cols].fillna(filtered_df[feature_cols].mean())
+            y = filtered_df[target_col].fillna(filtered_df[target_col].mean())
+            
+            # Adăugăm constanta pentru statsmodels
+            X = sm.add_constant(X)
+            
+            # Antrenăm modelul
+            model = sm.OLS(y, X).fit()
+            
+            # Afișăm rezultatele
+            st.subheader("Rezultate Model")
+            st.text(model.summary())
+            
+            # Vizualizăm reziduurile
+            fig, ax = plt.subplots(figsize=(10, 6))
+            ax.scatter(model.fittedvalues, model.resid)
+            ax.axhline(y=0, color='r', linestyle='--')
+            ax.set_xlabel('Valori Prezise')
+            ax.set_ylabel('Reziduuri')
+            st.pyplot(fig)
+            
+            # Vizualizăm coeficienții
+            coef_df = pd.DataFrame({
+                'Feature': ['const'] + feature_cols,
+                'Coefficient': model.params,
+                'P-value': model.pvalues
+            })
+            st.dataframe(coef_df.sort_values('P-value'), use_container_width=True)
+
+elif menu == "Clusterizare":
+    st.header("🔍 Analiza Clusterizării")
+    
+    # Selectăm variabilele pentru clusterizare
+    numeric_cols = filtered_df.select_dtypes(include=[np.number]).columns.tolist()
+    feature_cols = st.multiselect(
+        "Selectează variabilele pentru clusterizare",
+        numeric_cols,
+        default=['Temperature(F)', 'Humidity(%)', 'Pressure(in)', 'Visibility(mi)', 'Wind_Speed(mph)'],
+        key="cluster_features"
+    )
+    
+    if len(feature_cols) > 1:
+        # Pregătim datele
+        X = filtered_df[feature_cols].fillna(filtered_df[feature_cols].mean())
+        
+        # Scalăm datele
+        scaler = StandardScaler()
+        X_scaled = scaler.fit_transform(X)
+        
+        # Determinăm numărul optim de clustere
+        max_clusters = min(10, len(filtered_df) - 1)
+        
+        # Calculăm metricile pentru diferite numere de clustere
+        silhouette_scores = []
+        inertia_scores = []
+        calinski_scores = []
+        
+        for n_clusters in range(2, max_clusters + 1):
+            kmeans = KMeans(n_clusters=n_clusters, random_state=42)
+            clusters = kmeans.fit_predict(X_scaled)
+            
+            # Calculăm scorurile
+            silhouette_scores.append(silhouette_score(X_scaled, clusters))
+            inertia_scores.append(kmeans.inertia_)
+            calinski_scores.append(calinski_harabasz_score(X_scaled, clusters))
+        
+        # Creăm un DataFrame cu rezultatele
+        results_df = pd.DataFrame({
+            'Număr Clustere': range(2, max_clusters + 1),
+            'Scor Siluetă': silhouette_scores,
+            'Inerție': inertia_scores,
+            'Scor Calinski-Harabasz': calinski_scores
+        })
+        
+        # Afișăm rezultatele
+        st.subheader("Determinarea numărului optim de clustere")
+        
+        # Creăm un tab pentru fiecare metodă
+        tabs = st.tabs(["Scor Siluetă", "Metoda Cotului", "Calinski-Harabasz"])
+        
+        with tabs[0]:
+            st.write("Scorul de siluetă măsoară cât de bine sunt separate clusterele. Valori mai mari indică o clusterizare mai bună.")
+            fig = px.line(results_df, x='Număr Clustere', y='Scor Siluetă',
+                         title='Scor Siluetă vs Număr Clustere')
+            st.plotly_chart(fig, use_container_width=True)
+            
+            # Găsim numărul optim de clustere bazat pe scorul de siluetă
+            optimal_silhouette = results_df.loc[results_df['Scor Siluetă'].idxmax()]
+            st.success(f"Numărul optim de clustere bazat pe scorul de siluetă: {int(optimal_silhouette['Număr Clustere'])}")
+        
+        with tabs[1]:
+            st.write("Metoda cotului (elbow method) analizează rata de scădere a inerției. Căutăm 'cotul' în grafic.")
+            fig = px.line(results_df, x='Număr Clustere', y='Inerție',
+                         title='Inerție vs Număr Clustere')
+            st.plotly_chart(fig, use_container_width=True)
+            
+            # Calculăm rata de scădere a inerției
+            results_df['Rata Scădere'] = results_df['Inerție'].pct_change()
+            optimal_elbow = results_df.loc[results_df['Rata Scădere'].idxmin()]
+            st.success(f"Sugestie pentru numărul optim de clustere bazat pe metoda cotului: {int(optimal_elbow['Număr Clustere'])}")
+        
+        with tabs[2]:
+            st.write("Scorul Calinski-Harabasz măsoară raportul dintre dispersia inter-cluster și intra-cluster. Valori mai mari indică o clusterizare mai bună.")
+            fig = px.line(results_df, x='Număr Clustere', y='Scor Calinski-Harabasz',
+                         title='Scor Calinski-Harabasz vs Număr Clustere')
+            st.plotly_chart(fig, use_container_width=True)
+            
+            # Găsim numărul optim de clustere bazat pe scorul Calinski-Harabasz
+            optimal_calinski = results_df.loc[results_df['Scor Calinski-Harabasz'].idxmax()]
+            st.success(f"Numărul optim de clustere bazat pe scorul Calinski-Harabasz: {int(optimal_calinski['Număr Clustere'])}")
+        
+        # Aplicăm K-means cu numărul optim de clustere
+        n_clusters = int(optimal_silhouette['Număr Clustere'])
+        kmeans = KMeans(n_clusters=n_clusters, random_state=42)
+        clusters = kmeans.fit_predict(X_scaled)
+        
+        # Calculăm scorul de siluetă final
+        silhouette_avg = silhouette_score(X_scaled, clusters)
+        
+        # Adăugăm clusterele la DataFrame
+        df_clustered = filtered_df.copy()
+        df_clustered['Cluster'] = clusters
+        
+        # Afișăm statistici despre clustere
+        st.subheader("Statistici despre clustere")
+        cluster_stats = df_clustered.groupby('Cluster')[feature_cols].mean()
+        st.dataframe(cluster_stats, use_container_width=True)
+        
+        # Afișăm scorul de siluetă
+        st.metric("Scor de siluetă", f"{silhouette_avg:.3f}")
+        
+        # Vizualizăm clusterele în spațiul 2D
+        st.subheader("Vizualizare clustere")
+        
+        # Selectăm două variabile pentru vizualizare
+        col1, col2 = st.columns(2)
+        with col1:
+            x_axis = st.selectbox("Axează X", feature_cols, index=0, key="cluster_x")
+        with col2:
+            y_axis = st.selectbox("Axează Y", feature_cols, index=1, key="cluster_y")
+        
+        # Creăm scatter plot
+        fig = px.scatter(
+            df_clustered,
+            x=x_axis,
+            y=y_axis,
+            color='Cluster',
+            title=f"Clustere în spațiul {x_axis} vs {y_axis}",
+            labels={x_axis: x_axis, y_axis: y_axis}
+        )
+        st.plotly_chart(fig, use_container_width=True)
+        
+        # Afișăm distribuția variabilelor în clustere
+        st.subheader("Distribuția variabilelor în clustere")
+        for feature in feature_cols:
+            fig = px.box(
+                df_clustered,
+                x='Cluster',
+                y=feature,
+                title=f"Distribuția {feature} pe clustere"
+            )
+            st.plotly_chart(fig, use_container_width=True)
+        
+        # Afișăm câteva exemple din fiecare cluster
+        st.subheader("Exemple din fiecare cluster")
+        for cluster in range(n_clusters):
+            st.write(f"Cluster {cluster} - {len(df_clustered[df_clustered['Cluster'] == cluster])} accidente")
+            st.dataframe(
+                df_clustered[df_clustered['Cluster'] == cluster][feature_cols].head(5),
+                use_container_width=True
+            )
+    else:
+        st.warning("Selectați cel puțin două variabile pentru clusterizare!")
