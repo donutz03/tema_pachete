@@ -16,6 +16,7 @@ import statsmodels.api as sm
 from sklearn.cluster import KMeans
 from sklearn.metrics import silhouette_score, calinski_harabasz_score
 from scalare_utils import aplica_scalare, adauga_sectiune_scalare
+import plotly.graph_objects as go
 
 st.set_page_config(page_title="US Accidents Analysis", layout="wide")
 
@@ -73,15 +74,21 @@ with st.expander("📋 Dataset Description"):
     - **Astronomical_Twilight**: Day or night based on astronomical twilight
     """)
 
-#old load data, cu toate datele
 @st.cache_data
 def load_data():
     df = pd.read_csv('US_Accidents_Sample_1000_Per_Year.csv')
 
-    df['Start_Time'] = pd.to_datetime(df['Start_Time'], format='mixed')
-    df['End_Time'] = pd.to_datetime(df['End_Time'], format='mixed')
+    # Convertim coloanele de timp
+    df['Start_Time'] = pd.to_datetime(df['Start_Time'], errors='coerce')
+    df['End_Time'] = pd.to_datetime(df['End_Time'], errors='coerce')
 
+    # Calculăm durata
     df['Duration'] = (df['End_Time'] - df['Start_Time']).dt.total_seconds() / 60
+
+    # Convertim coloanele de tip object în string
+    for col in df.select_dtypes(include='object').columns:
+        if not pd.api.types.is_datetime64_any_dtype(df[col]):
+            df[col] = df[col].astype(str)
 
     return df
 
@@ -137,10 +144,12 @@ if menu == "Analiză Generală":
         'Valori Nule': filtered_df.isna().sum().values,
         'Procent Nule': (filtered_df.isna().sum().values / len(filtered_df) * 100).round(2)
     })
-    st.dataframe(data_types, use_container_width=True)
+    data_types['Tip'] = data_types['Tip'].astype(str)
+    st.dataframe(data_types, hide_index=True)
 
     st.subheader("Statistici de bază")
-    st.dataframe(filtered_df.describe(), use_container_width=True)
+    stats_df = filtered_df.describe().round(2).astype(str)
+    st.dataframe(stats_df, hide_index=True)
 
 elif menu == "Tratarea Valorilor Lipsă":
     st.header("🧩 Tratarea Valorilor Lipsă")
@@ -872,8 +881,23 @@ elif menu == "Clusterizare":
         
         with tabs[0]:
             st.write("Scorul de siluetă măsoară cât de bine sunt separate clusterele. Valori mai mari indică o clusterizare mai bună.")
-            fig = px.line(results_df, x='Număr Clustere', y='Scor Siluetă',
-                         title='Scor Siluetă vs Număr Clustere')
+            fig = go.Figure()
+            
+            # Adăugăm inerția
+            fig.add_trace(go.Scatter(
+                x=results_df['Număr Clustere'],
+                y=results_df['Scor Siluetă'],
+                name='Scor Siluetă',
+                line=dict(color='blue')
+            ))
+            
+            # Configurăm layout-ul
+            fig.update_layout(
+                title='Scor Siluetă vs Număr Clustere',
+                xaxis_title='Număr Clustere',
+                yaxis_title='Scor Siluetă'
+            )
+            
             st.plotly_chart(fig, use_container_width=True)
             
             # Găsim numărul optim de clustere bazat pe scorul de siluetă
@@ -882,19 +906,77 @@ elif menu == "Clusterizare":
         
         with tabs[1]:
             st.write("Metoda cotului (elbow method) analizează rata de scădere a inerției. Căutăm 'cotul' în grafic.")
-            fig = px.line(results_df, x='Număr Clustere', y='Inerție',
-                         title='Inerție vs Număr Clustere')
-            st.plotly_chart(fig, use_container_width=True)
             
             # Calculăm rata de scădere a inerției
             results_df['Rata Scădere'] = results_df['Inerție'].pct_change()
+            
+            # Creăm figura cu două axe y
+            fig = go.Figure()
+            
+            # Adăugăm inerția
+            fig.add_trace(go.Scatter(
+                x=results_df['Număr Clustere'],
+                y=results_df['Inerție'],
+                name='Inerție',
+                line=dict(color='blue')
+            ))
+            
+            # Adăugăm rata de scădere
+            fig.add_trace(go.Scatter(
+                x=results_df['Număr Clustere'],
+                y=results_df['Rata Scădere'],
+                name='Rata Scădere',
+                line=dict(color='red'),
+                yaxis='y2'
+            ))
+            
+            # Configurăm layout-ul
+            fig.update_layout(
+                title='Metoda Cotului (Elbow Method)',
+                xaxis_title='Număr Clustere',
+                yaxis=dict(
+                    title=dict(
+                        text='Inerție',
+                        font=dict(color='blue')
+                    ),
+                    tickfont=dict(color='blue')
+                ),
+                yaxis2=dict(
+                    title=dict(
+                        text='Rata Scădere',
+                        font=dict(color='red')
+                    ),
+                    tickfont=dict(color='red'),
+                    overlaying='y',
+                    side='right'
+                )
+            )
+            
+            st.plotly_chart(fig, use_container_width=True)
+            
+            # Găsim punctul de cot
             optimal_elbow = results_df.loc[results_df['Rata Scădere'].idxmin()]
             st.success(f"Sugestie pentru numărul optim de clustere bazat pe metoda cotului: {int(optimal_elbow['Număr Clustere'])}")
         
         with tabs[2]:
             st.write("Scorul Calinski-Harabasz măsoară raportul dintre dispersia inter-cluster și intra-cluster. Valori mai mari indică o clusterizare mai bună.")
-            fig = px.line(results_df, x='Număr Clustere', y='Scor Calinski-Harabasz',
-                         title='Scor Calinski-Harabasz vs Număr Clustere')
+            fig = go.Figure()
+            
+            # Adăugăm scorul Calinski-Harabasz
+            fig.add_trace(go.Scatter(
+                x=results_df['Număr Clustere'],
+                y=results_df['Scor Calinski-Harabasz'],
+                name='Scor Calinski-Harabasz',
+                line=dict(color='green')
+            ))
+            
+            # Configurăm layout-ul
+            fig.update_layout(
+                title='Scor Calinski-Harabasz vs Număr Clustere',
+                xaxis_title='Număr Clustere',
+                yaxis_title='Scor Calinski-Harabasz'
+            )
+            
             st.plotly_chart(fig, use_container_width=True)
             
             # Găsim numărul optim de clustere bazat pe scorul Calinski-Harabasz
@@ -906,6 +988,11 @@ elif menu == "Clusterizare":
         kmeans = KMeans(n_clusters=n_clusters, random_state=42)
         clusters = kmeans.fit_predict(X_scaled)
         
+        # Afișăm distribuția punctelor în clustere
+        st.subheader("Distribuția punctelor în clustere")
+        cluster_distribution = pd.Series(clusters).value_counts().sort_index()
+        st.dataframe(cluster_distribution.to_frame('Număr Puncte'), hide_index=True)
+        
         # Calculăm scorul de siluetă final
         silhouette_avg = silhouette_score(X_scaled, clusters)
         
@@ -916,7 +1003,9 @@ elif menu == "Clusterizare":
         # Afișăm statistici despre clustere
         st.subheader("Statistici despre clustere")
         cluster_stats = df_clustered.groupby('Cluster')[feature_cols].mean()
-        st.dataframe(cluster_stats, use_container_width=True)
+        # Convertim la string pentru a evita probleme de serializare
+        cluster_stats_str = cluster_stats.round(2).astype(str)
+        st.dataframe(cluster_stats_str, hide_index=True)
         
         # Afișăm scorul de siluetă
         st.metric("Scor de siluetă", f"{silhouette_avg:.3f}")
@@ -931,35 +1020,103 @@ elif menu == "Clusterizare":
         with col2:
             y_axis = st.selectbox("Axează Y", feature_cols, index=1, key="cluster_y")
         
-        # Creăm scatter plot
-        fig = px.scatter(
-            df_clustered,
-            x=x_axis,
-            y=y_axis,
-            color='Cluster',
-            title=f"Clustere în spațiul {x_axis} vs {y_axis}",
-            labels={x_axis: x_axis, y_axis: y_axis}
-        )
-        st.plotly_chart(fig, use_container_width=True)
-        
-        # Afișăm distribuția variabilelor în clustere
-        st.subheader("Distribuția variabilelor în clustere")
-        for feature in feature_cols:
-            fig = px.box(
-                df_clustered,
-                x='Cluster',
-                y=feature,
-                title=f"Distribuția {feature} pe clustere"
+        if x_axis == y_axis:
+            st.warning("Alege două coloane diferite pentru X și Y!")
+        else:
+            # Creăm DataFrame-ul scalat
+            df_scaled = pd.DataFrame(X_scaled, columns=feature_cols)
+            df_scaled['Cluster'] = clusters
+            
+            # Creăm figura pentru clustere
+            fig = go.Figure()
+            
+            # Definim o paletă de culori pentru clustere
+            colors = px.colors.qualitative.Set1
+            
+            # Adăugăm punctele pentru fiecare cluster
+            for cluster in range(n_clusters):
+                cluster_data = df_scaled[df_scaled['Cluster'] == cluster]
+                fig.add_trace(go.Scatter(
+                    x=cluster_data[x_axis],
+                    y=cluster_data[y_axis],
+                    mode='markers',
+                    name=f'Cluster {cluster}',
+                    marker=dict(
+                        size=8,
+                        color=colors[cluster % len(colors)]
+                    )
+                ))
+            
+            # Adăugăm centroidele
+            centroids = kmeans.cluster_centers_
+            centroids_df = pd.DataFrame(centroids, columns=feature_cols)
+            fig.add_trace(go.Scatter(
+                x=centroids_df[x_axis],
+                y=centroids_df[y_axis],
+                mode='markers',
+                name='Centroide',
+                marker=dict(
+                    size=12,
+                    symbol='star',
+                    color='black'
+                )
+            ))
+            
+            # Configurăm layout-ul
+            fig.update_layout(
+                title=dict(
+                    text=f'Clustere în spațiul {x_axis} vs {y_axis} (date scalate)',
+                    font=dict(size=16)
+                ),
+                xaxis_title=x_axis,
+                yaxis_title=y_axis,
+                showlegend=True,
+                legend=dict(
+                    title='Clustere',
+                    yanchor="top",
+                    y=0.99,
+                    xanchor="left",
+                    x=0.01
+                )
             )
+            
             st.plotly_chart(fig, use_container_width=True)
-        
-        # Afișăm câteva exemple din fiecare cluster
-        st.subheader("Exemple din fiecare cluster")
-        for cluster in range(n_clusters):
-            st.write(f"Cluster {cluster} - {len(df_clustered[df_clustered['Cluster'] == cluster])} accidente")
-            st.dataframe(
-                df_clustered[df_clustered['Cluster'] == cluster][feature_cols].head(5),
-                use_container_width=True
+            
+            # Adăugăm și un scatter plot cu datele originale pentru comparație
+            fig_original = go.Figure()
+            
+            # Adăugăm punctele pentru fiecare cluster
+            for cluster in range(n_clusters):
+                cluster_data = df_clustered[df_clustered['Cluster'] == cluster]
+                fig_original.add_trace(go.Scatter(
+                    x=cluster_data[x_axis],
+                    y=cluster_data[y_axis],
+                    mode='markers',
+                    name=f'Cluster {cluster}',
+                    marker=dict(
+                        size=8,
+                        color=colors[cluster % len(colors)]
+                    )
+                ))
+            
+            # Configurăm layout-ul
+            fig_original.update_layout(
+                title=dict(
+                    text=f'Clustere în spațiul {x_axis} vs {y_axis} (date originale)',
+                    font=dict(size=16)
+                ),
+                xaxis_title=x_axis,
+                yaxis_title=y_axis,
+                showlegend=True,
+                legend=dict(
+                    title='Clustere',
+                    yanchor="top",
+                    y=0.99,
+                    xanchor="left",
+                    x=0.01
+                )
             )
+            
+            st.plotly_chart(fig_original, use_container_width=True)
     else:
         st.warning("Selectați cel puțin două variabile pentru clusterizare!")
