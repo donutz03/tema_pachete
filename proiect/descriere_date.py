@@ -17,6 +17,11 @@ from sklearn.cluster import KMeans
 from sklearn.metrics import silhouette_score, calinski_harabasz_score
 from scalare_utils import aplica_scalare, adauga_sectiune_scalare
 import plotly.graph_objects as go
+from shapely.geometry import Point
+import contextily as ctx
+import folium
+from folium.plugins import HeatMap
+from streamlit_folium import st_folium
 
 st.set_page_config(page_title="US Accidents Analysis", layout="wide")
 
@@ -98,8 +103,9 @@ with st.sidebar:
     st.header("Meniu Principal")
     menu = st.radio(
         "Selectează secțiunea:",
-        ["Analiză Generală", "Tratarea Valorilor Lipsă", "Identificarea Valorilor Extreme", "Grupări și Corelații",
-         "Scalarea Datelor", "Codificare și Regresie", "Clusterizare"]
+        ["Analiză Generală", "Tratarea Valorilor Lipsă", "Identificarea Valorilor Extreme", 
+         "Grupări și Corelații", "Scalarea Datelor", "Codificare și Regresie", 
+         "Clusterizare", "Analiză Geografică"]
     )
 
     st.header("Filtrare Date")
@@ -827,6 +833,298 @@ elif menu == "Codificare și Regresie":
                 'P-value': model.pvalues
             })
             st.dataframe(coef_df.sort_values('P-value'), use_container_width=True)
+
+elif menu == "Analiză Geografică":
+    st.header("🗺️ Analiză Geografică cu GeoPandas")
+    
+    # Verificăm dacă avem date valide pentru coordonate
+    valid_coords = filtered_df.dropna(subset=['Start_Lat', 'Start_Lng'])
+    
+    if len(valid_coords) == 0:
+        st.warning("Nu există date cu coordonate valide în selecția curentă!")
+    else:
+        st.subheader(f"Analiza geografică pentru {len(valid_coords)} accidente")
+        
+        # Creăm geometria punctelor
+        geometry = [Point(xy) for xy in zip(valid_coords.Start_Lng, valid_coords.Start_Lat)]
+        
+        # Creăm GeoDataFrame
+        gdf = gpd.GeoDataFrame(valid_coords, geometry=geometry, crs="EPSG:4326")
+        
+        # Tabs pentru diferite vizualizări
+        geo_tabs = st.tabs(["Harta Interactivă", "Analiză pe State", "Analiză pe Zone", "Densitate Accidente"])
+        
+        with geo_tabs[0]:
+            st.subheader("Hartă Interactivă a Accidentelor")
+            
+            # Selectăm tipul de vizualizare
+            map_type = st.radio("Tip hartă:", ["Puncte individuale", "Heatmap", "Clustere"])
+            
+            # Centrul hărții (media coordonatelor)
+            center_lat = valid_coords['Start_Lat'].mean()
+            center_lng = valid_coords['Start_Lng'].mean()
+            
+            # Creăm harta Folium
+            m = folium.Map(location=[center_lat, center_lng], zoom_start=5)
+            
+            if map_type == "Puncte individuale":
+                # Alegem ce să colorăm
+                color_by = st.selectbox("Colorează după:", ["Severity", "Weather_Condition", "Hour"])
+                
+                # Definim culori pentru severitate
+                severity_colors = {1: 'green', 2: 'yellow', 3: 'orange', 4: 'red'}
+                
+                # Adăugăm puncte pe hartă
+                for idx, row in gdf.iterrows():
+                    if color_by == "Severity":
+                        color = severity_colors.get(row['Severity'], 'gray')
+                    elif color_by == "Weather_Condition":
+                        # Pentru condiții meteo folosim o paletă diferită
+                        weather_colors = {
+                            'Clear': 'blue', 'Cloudy': 'gray', 'Rain': 'lightblue',
+                            'Snow': 'white', 'Fog': 'darkgray'
+                        }
+                        color = weather_colors.get(row['Weather_Condition'], 'black')
+                    else:  # Hour
+                        hour = row['Start_Time'].hour
+                        if 6 <= hour < 12:
+                            color = 'orange'  # Dimineața
+                        elif 12 <= hour < 18:
+                            color = 'yellow'  # După-amiaza
+                        elif 18 <= hour < 22:
+                            color = 'purple'  # Seara
+                        else:
+                            color = 'darkblue'  # Noaptea
+                    
+                    folium.CircleMarker(
+                        location=[row.geometry.y, row.geometry.x],
+                        radius=5,
+                        popup=f"Severity: {row['Severity']}<br>Time: {row['Start_Time']}<br>Weather: {row['Weather_Condition']}",
+                        color=color,
+                        fill=True,
+                        fillColor=color,
+                        fillOpacity=0.7
+                    ).add_to(m)
+            
+            elif map_type == "Heatmap":
+                # Creăm heatmap
+                heat_data = [[row.geometry.y, row.geometry.x] for idx, row in gdf.iterrows()]
+                HeatMap(heat_data).add_to(m)
+            
+            else:  # Clustere
+                # Adăugăm clustere de puncte
+                marker_cluster = folium.plugins.MarkerCluster().add_to(m)
+                
+                for idx, row in gdf.iterrows():
+                    folium.Marker(
+                        location=[row.geometry.y, row.geometry.x],
+                        popup=f"Severity: {row['Severity']}<br>Time: {row['Start_Time']}"
+                    ).add_to(marker_cluster)
+            
+            # Afișăm harta
+            st_folium(m, width=800, height=600)
+        
+        with geo_tabs[1]:
+            st.subheader("Analiză pe State")
+            
+            # Grupăm după state
+            state_analysis = valid_coords.groupby('State').agg({
+                'ID': 'count',
+                'Severity': 'mean',
+                'Start_Lat': 'mean',
+                'Start_Lng': 'mean'
+            }).reset_index()
+            
+            state_analysis.columns = ['State', 'Număr Accidente', 'Severitate Medie', 'Lat', 'Lng']
+            state_analysis = state_analysis.sort_values('Număr Accidente', ascending=False)
+            
+            # Afișăm top 10 state
+            st.subheader("Top 10 State după Număr de Accidente")
+            st.dataframe(state_analysis.head(10), use_container_width=True)
+            
+            # Grafic bar
+            fig = px.bar(
+                state_analysis.head(20),
+                x='State',
+                y='Număr Accidente',
+                color='Severitate Medie',
+                title='Top 20 State după Număr de Accidente'
+            )
+            st.plotly_chart(fig, use_container_width=True)
+            
+            # Hartă cu bule pentru state
+            st.subheader("Hartă State - Dimensiune după Număr Accidente")
+            
+            state_map = folium.Map(location=[center_lat, center_lng], zoom_start=4)
+            
+            for idx, row in state_analysis.iterrows():
+                folium.CircleMarker(
+                    location=[row['Lat'], row['Lng']],
+                    radius=np.sqrt(row['Număr Accidente']) / 2,
+                    popup=f"{row['State']}<br>Accidente: {row['Număr Accidente']}<br>Severitate Medie: {row['Severitate Medie']:.2f}",
+                    color='red',
+                    fill=True,
+                    fillOpacity=0.6
+                ).add_to(state_map)
+            
+            st_folium(state_map, width=800, height=600)
+        
+        with geo_tabs[2]:
+            st.subheader("Analiză pe Zone")
+            
+            # Creăm zone folosind hexbin sau grid
+            zone_type = st.radio("Tip de zonă:", ["Grid rectangular", "Hexagoane"])
+            
+            if zone_type == "Grid rectangular":
+                # Creăm grid
+                resolution = st.slider("Rezoluție grid (număr celule pe latură)", 10, 50, 20)
+                
+                # Calculăm limitele
+                minx, miny, maxx, maxy = gdf.total_bounds
+                
+                # Creăm grid-ul
+                x_step = (maxx - minx) / resolution
+                y_step = (maxy - miny) / resolution
+                
+                # Creăm celulele grid-ului
+                grid_cells = []
+                grid_counts = []
+                
+                for i in range(resolution):
+                    for j in range(resolution):
+                        cell_minx = minx + i * x_step
+                        cell_miny = miny + j * y_step
+                        cell_maxx = cell_minx + x_step
+                        cell_maxy = cell_miny + y_step
+                        
+                        # Creăm poligonul celulei
+                        cell = gpd.GeoSeries([
+                            Point(cell_minx, cell_miny),
+                            Point(cell_maxx, cell_miny),
+                            Point(cell_maxx, cell_maxy),
+                            Point(cell_minx, cell_maxy)
+                        ]).unary_union.convex_hull
+                        
+                        # Numărăm punctele în celulă
+                        points_in_cell = gdf[gdf.geometry.within(cell)]
+                        count = len(points_in_cell)
+                        
+                        if count > 0:
+                            grid_cells.append(cell)
+                            grid_counts.append(count)
+                
+                # Creăm GeoDataFrame pentru grid
+                grid_gdf = gpd.GeoDataFrame({'geometry': grid_cells, 'count': grid_counts})
+                
+                # Vizualizăm
+                fig, ax = plt.subplots(figsize=(12, 8))
+                grid_gdf.plot(column='count', cmap='YlOrRd', legend=True, ax=ax)
+                ax.set_title('Densitate Accidente pe Grid')
+                st.pyplot(fig)
+                
+            else:  # Hexagoane
+                st.info("Pentru o vizualizare hexagonală mai avansată, se recomandă folosirea h3-py sau alte biblioteci specializate.")
+                
+                # Alternativ, folosim scatter plot cu hexbin
+                fig, ax = plt.subplots(figsize=(12, 8))
+                hb = ax.hexbin(gdf.geometry.x, gdf.geometry.y, gridsize=30, cmap='YlOrRd')
+                cb = fig.colorbar(hb, ax=ax)
+                cb.set_label('Număr Accidente')
+                ax.set_title('Densitate Accidente - Hexbin')
+                st.pyplot(fig)
+        
+        with geo_tabs[3]:
+            st.subheader("Analiză Densitate Accidente")
+            
+            # Kernel Density Estimation
+            st.markdown("### Estimare Densitate Kernel (KDE)")
+            
+            fig, ax = plt.subplots(figsize=(12, 8))
+            
+            # Plot KDE
+            gdf.plot(ax=ax, alpha=0.5, color='red', markersize=1)
+            
+            # Adăugăm harta de bază
+            try:
+                ctx.add_basemap(ax, source=ctx.providers.CartoDB.Positron, crs=gdf.crs.to_string())
+            except:
+                st.warning("Nu s-a putut adăuga harta de bază. Continuăm fără ea.")
+            
+            ax.set_title('Distribuția Geografică a Accidentelor')
+            st.pyplot(fig)
+            
+            # Analiza pe zone metropolitane
+            st.markdown("### Analiza pe Zone Metropolitane")
+            
+            # Grupăm după oraș și calculăm statistici
+            city_analysis = valid_coords.groupby('City').agg({
+                'ID': 'count',
+                'Severity': 'mean',
+                'Distance(mi)': 'mean',
+                'Start_Lat': 'mean',
+                'Start_Lng': 'mean'
+            }).reset_index()
+            
+            city_analysis.columns = ['City', 'Număr Accidente', 'Severitate Medie', 
+                                   'Distanță Medie', 'Lat', 'Lng']
+            city_analysis = city_analysis.sort_values('Număr Accidente', ascending=False)
+            
+            # Afișăm top 20 orașe
+            st.subheader("Top 20 Orașe după Număr de Accidente")
+            st.dataframe(city_analysis.head(20), use_container_width=True)
+            
+            # Scatter plot pentru orașe
+            fig = px.scatter(
+                city_analysis.head(50),
+                x='Lng',
+                y='Lat',
+                size='Număr Accidente',
+                color='Severitate Medie',
+                hover_name='City',
+                title='Top 50 Orașe - Dimensiune după Număr Accidente',
+                color_continuous_scale='RdYlBu_r'
+            )
+            st.plotly_chart(fig, use_container_width=True)
+            
+            # Analiza temporală geografică
+            st.markdown("### Analiza Temporală Geografică")
+            
+            # Selectăm perioada
+            time_period = st.selectbox("Analizează după:", 
+                                     ["Ora din zi", "Zi a săptămânii", "Lună", "An"])
+            
+            if time_period == "Ora din zi":
+                valid_coords['Hour'] = valid_coords['Start_Time'].dt.hour
+                time_group = 'Hour'
+            elif time_period == "Zi a săptămânii":
+                valid_coords['DayOfWeek'] = valid_coords['Start_Time'].dt.dayofweek
+                time_group = 'DayOfWeek'
+            elif time_period == "Lună":
+                valid_coords['Month'] = valid_coords['Start_Time'].dt.month
+                time_group = 'Month'
+            else:  # An
+                valid_coords['Year'] = valid_coords['Start_Time'].dt.year
+                time_group = 'Year'
+            
+            # Creăm animație pentru perioada selectată
+            time_data = valid_coords.groupby(time_group).agg({
+                'ID': 'count',
+                'Start_Lat': list,
+                'Start_Lng': list
+            }).reset_index()
+            
+            # Afișăm evoluția în timp
+            fig = px.scatter_mapbox(
+                valid_coords,
+                lat='Start_Lat',
+                lon='Start_Lng',
+                color='Severity',
+                animation_frame=time_group,
+                zoom=3,
+                mapbox_style="carto-positron",
+                title=f'Evoluția Accidentelor după {time_period}'
+            )
+            st.plotly_chart(fig, use_container_width=True)
 
 elif menu == "Clusterizare":
     st.header("🔍 Analiza Clusterizării")
