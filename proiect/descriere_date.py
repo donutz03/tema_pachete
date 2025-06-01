@@ -85,6 +85,11 @@ def load_data():
 
     # Convertim coloanele de timp
     df['Start_Time'] = pd.to_datetime(df['Start_Time'], errors='coerce')
+    
+    # FIX: Curățăm valorile End_Time cu nanosecunde înainte de conversie
+    # Problemă: pandas nu poate converti o Serie mixtă cu formate diferite de datetime
+    # Valorile din 2023 au format cu nanosecunde (.000000000) care cauzează probleme
+    df['End_Time'] = df['End_Time'].str.replace('.000000000', '', regex=False)
     df['End_Time'] = pd.to_datetime(df['End_Time'], errors='coerce')
 
     # Calculăm durata
