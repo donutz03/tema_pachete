@@ -216,11 +216,15 @@ elif menu == "Tratarea Valorilor Lipsă":
                     st.dataframe(df_replaced[[selected_col]].describe(), use_container_width=True)
 
             else:
-                mode_value = filtered_df[selected_col].mode()[0]
-                df_replaced = filtered_df.copy()
-                df_replaced[selected_col] = df_replaced[selected_col].fillna(mode_value)
-
-                st.success(f"Pentru coloana categorică, valorile lipsă au fost înlocuite cu modul: {mode_value}")
+                mode_series = filtered_df[selected_col].mode()
+                if not mode_series.empty:
+                    mode_value = mode_series[0]
+                    df_replaced = filtered_df.copy()
+                    df_replaced[selected_col] = df_replaced[selected_col].fillna(mode_value)
+                    st.success(f"Pentru coloana categorică, valorile lipsă au fost înlocuite cu modul: {mode_value}")
+                else:
+                    st.warning("Nu există o valoare mod pentru această coloană. Nu s-a efectuat nicio înlocuire.")
+                    df_replaced = filtered_df.copy()
 
         with tabs[1]:
             st.markdown("#### Înlocuire cu KNN")
