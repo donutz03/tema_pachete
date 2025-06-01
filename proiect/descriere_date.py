@@ -543,6 +543,7 @@ elif menu == "Grupări și Corelații":
         date_cols = ['Start_Time']
 
         # Adăugăm coloane derivate pentru grupare temporală
+        filtered_df = filtered_df.copy()
         filtered_df['Month'] = filtered_df['Start_Time'].dt.month
         filtered_df['DayOfWeek'] = filtered_df['Start_Time'].dt.dayofweek
         filtered_df['Hour'] = filtered_df['Start_Time'].dt.hour
@@ -735,7 +736,7 @@ elif menu == "Codificare și Regresie":
             st.dataframe(encoding_df, use_container_width=True)
             
         else:  # One-Hot Encoding
-            ohe = OneHotEncoder(sparse=False)
+            ohe = OneHotEncoder(sparse_output=False)
             encoded_values = ohe.fit_transform(filtered_df[[selected_col]].fillna('Missing'))
             
             # Creăm un DataFrame pentru vizualizare
@@ -777,7 +778,7 @@ elif menu == "Codificare și Regresie":
             y_pred = model.predict(X_test)
             
             st.subheader("Rezultate Model")
-            st.text(classification_report(y_test, y_pred))
+            st.text(classification_report(y_test, y_pred, zero_division=0))
             
             # Vizualizăm matricea de confuzie
             cm = confusion_matrix(y_test, y_pred)
